@@ -1,0 +1,15 @@
+# Ignore local Terraform artifacts and secret vars
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+*.tfstate
+*.tfstate.*
+
+# Local override and secret tfvars
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Specifically ignore secret api key file
+cudo/secrets.auto.tfvars
+cudo/secrets.tfvars
