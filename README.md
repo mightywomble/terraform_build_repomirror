@@ -125,6 +125,28 @@ variable "cudo_platform" {}
 ```
 
 ---
+# Running Terraform, what is going on..
+
+Think of building infrastructure with Terraform like assembling a complex piece of furniture. You need to follow a clear set of steps to ensure it's built correctly and exactly as the instructions intended. These commands are those steps.
+
+## Initialization & Validation
+First, you need to prepare your workspace and check your instructions.
+
+terraform init: This is the very first command you run in a new Terraform project. It's like opening the furniture box and laying out all the tools and parts. This command downloads the necessary plugins (called providers) that allow Terraform to communicate with your cloud provider (like AWS, Azure, or Google Cloud). It only needs to be run once at the beginning or whenever you add a new provider.
+
+terraform fmt -recursive & terraform validate: These are your quality checks. The fmt command tidies up your code, making it neat and easy to read, which is helpful when working in a team. The validate command runs a quick check for any syntax errors or typos in your configuration files. Think of this as proofreading the instruction manual to make sure it's written correctly before you start building.
+
+## Planning & Applying Changes
+Next, you create a blueprint of what you're going to build and then execute that plan.
+
+terraform plan --out plan.out: This is arguably the most important command. It creates an execution plan, which is a detailed preview of exactly what Terraform will do. It will show you which resources it will create, change, or destroy without actually making any changes. By using the --out plan.out flag, you save this exact plan to a file. This is like getting a final, itemized quote from a contractor before they start work, ensuring there are no surprises.
+
+terraform apply plan.out: This command executes the plan you just saved. It takes the plan.out file and builds the infrastructure exactly as described in it. By applying a saved plan, you guarantee that the actions Terraform takes are the same ones you reviewed and approved, preventing any accidental changes. This is the "build" step where the furniture is actually assembled according to the blueprint.
+
+## Verifying the Result
+Finally, after the work is done, you inspect the final product.
+
+terraform state list & terraform show: These commands let you see what you've built. terraform state list gives you a simple inventory of all the resources Terraform is currently managing. For a more detailed view, terraform show displays all the attributes of those resources, such as their IP addresses, IDs, and other settings. This is your way of looking at the finished piece of furniture and confirming all the parts are in the right place and it matches the design.
 
 ## What this Terraform code does
 
