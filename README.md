@@ -91,22 +91,32 @@ export TF_VAR_boot_disk_size=200
 export TF_VAR_ssh_key_source=user
 ```
 
-### Option B: Use a local terraform.tfvars (never commit secrets)
+### Option B: Use local tfvars files (never commit secrets)
 
-Create `cudo/terraform.tfvars` with your values. Example template:
+We recommend splitting secrets into a separate file which is ignored by Git.
+
+1) Create `cudo/terraform.tfvars` with only non-secret values:
 
 ```hcl path=null start=null
-# cudo/terraform.tfvars (example template)
+# cudo/terraform.tfvars (checked in; no secrets)
 project_id       = "cudos-public-testnet"
 cudo_platform    = "public-testnet"
 boot_disk_size   = "200"
 vcpus            = 2
 memory_gib       = 4
 data_center_id   = "gb-bournemouth-1"
-api_key          = "{{CUDO_API_KEY}}"  # replace with your key; do not commit
 ssh_key_source   = "user"
 image_id         = "ubuntu-24-04"
 ```
+
+2) Create `cudo/secrets.auto.tfvars` with your secret (this file is .gitignored):
+
+```hcl path=null start=null
+# cudo/secrets.auto.tfvars (ignored by Git)
+api_key = "{{CUDO_API_KEY}}"
+```
+
+Terraform automatically loads any `*.auto.tfvars` files in the working directory, so you don't need to pass `-var-file` flags.
 
 ### If you need variable declarations (variables.tf)
 
@@ -176,9 +186,13 @@ terraform validate
 
 # Create a plan and save it to a file
 terraform plan --out plan.out
+# If you chose not to use secrets.auto.tfvars, you could also provide var files explicitly, e.g.:
+# terraform plan --var-file=terraform.tfvars --var-file=secrets.auto.tfvars --out plan.out
 
 # Apply exactly what was planned ("terraform run" is not a Terraform command)
 terraform apply plan.out
+# Or with explicit var files (if not using auto.tfvars):
+# terraform apply -var-file=terraform.tfvars -var-file=secrets.auto.tfvars plan.out
 ```
 
 ### Verifying the deployment
