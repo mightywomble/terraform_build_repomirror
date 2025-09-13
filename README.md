@@ -1,4 +1,4 @@
-# Cudo Ubuntu Mirror Infrastructure (Terraform)
+# Ubuntu Mirror Infrastructure (Terraform)
 
 This repository contains Terraform code that provisions a single Cudo VM named "cudo-ubuntu-mirror" in the Bournemouth data center, with:
 - CPU-only machine type (no GPUs)
