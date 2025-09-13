@@ -12,7 +12,7 @@ It is written for absolute beginners to Terraform. Follow the steps below to ins
 
 ## Prerequisites
 
-- A Linux Mint machine (Ubuntu-based). Commands below use bash.
+- An Ubuntu Linux workstation machine (Ubuntu-based). Commands below use bash.
 - A Cudo API key with access to your project.
 - Git installed.
 - SSH keys available in your Cudo account (we use `ssh_key_source = "user"`).
