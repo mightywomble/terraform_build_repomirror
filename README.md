@@ -46,15 +46,26 @@ terraform -version
 
 ## Repository layout
 
-- `cudo/cudo_terraform.tf` — Main Terraform configuration:
+- `cudo_terraform.tf` — Main Terraform configuration:
   - Declares the Cudo provider and version
   - Creates a 1 TiB storage disk resource
   - Creates the VM resource and attaches the storage disk
   - References variables like `var.api_key`, `var.project_id`, `var.data_center_id`, etc.
-- `cudo/terraform.tfvars` — Variable values for this environment (example values). You may override these locally or via environment variables.
-- `cudo/variables.tf` — Variable declarations (types, names). In this repository it is encrypted; for public use you can declare variables yourself (see below) and provide values via env vars or tfvars.
+- `variables.tf` — Variable declarations for all inputs used by the config.
+- `terraform.tfvars` — Non-secret variable values for this environment (example values). You may override locally or via environment variables.
+- `secrets.auto.tfvars` — Your API key only (gitignored by default). Never commit secrets.
+- `images_lookup.tf` — Temporary helper to list available images from the provider (optional; safe to remove after use).
+- `.gitignore` — Ensures local state and secret tfvars are ignored.
 
-Tip: For GitHub/public use, keep secrets out of version control. Prefer environment variables or a local `terraform.tfvars` in `.gitignore`.
+Tip: For GitHub/public use, keep secrets out of version control. Prefer environment variables or a local `secrets.auto.tfvars` in `.gitignore`.
+
+### Recent changes
+
+- Added `variables.tf` with typed declarations so `terraform validate` succeeds.
+- Removed unsupported `max_price_hr` argument from `cudo_vm` (provider v0.11.1 does not accept it).
+- Corrected image handling and examples — use `image_id = "ubuntu-2404"` for Ubuntu 24.04.
+- Sanitized `terraform.tfvars` and moved secrets to `secrets.auto.tfvars` (ignored by Git).
+- Added `images_lookup.tf` and instructions to list available images via the provider data source.
 
 ---
 
@@ -84,7 +95,7 @@ export TF_VAR_api_key={{CUDO_API_KEY}}
 # Non-secret values can also be provided via env vars (optional):
 export TF_VAR_project_id=cudos-public-testnet
 export TF_VAR_data_center_id=gb-bournemouth-1
-export TF_VAR_image_id=ubuntu-24-04
+export TF_VAR_image_id=ubuntu-2404
 export TF_VAR_vcpus=2
 export TF_VAR_memory_gib=4
 export TF_VAR_boot_disk_size=200
@@ -95,10 +106,10 @@ export TF_VAR_ssh_key_source=user
 
 We recommend splitting secrets into a separate file which is ignored by Git.
 
-1) Create `cudo/terraform.tfvars` with only non-secret values:
+1) Create `terraform.tfvars` (checked in; no secrets) with only non-secret values:
 
 ```hcl path=null start=null
-# cudo/terraform.tfvars (checked in; no secrets)
+# terraform.tfvars (checked in; no secrets)
 project_id       = "cudos-public-testnet"
 cudo_platform    = "public-testnet"
 boot_disk_size   = "200"
@@ -106,13 +117,13 @@ vcpus            = 2
 memory_gib       = 4
 data_center_id   = "gb-bournemouth-1"
 ssh_key_source   = "user"
-image_id         = "ubuntu-24-04"
+image_id         = "ubuntu-2404"
 ```
 
-2) Create `cudo/secrets.auto.tfvars` with your secret (this file is .gitignored):
+2) Create `secrets.auto.tfvars` (gitignored) with your secret:
 
 ```hcl path=null start=null
-# cudo/secrets.auto.tfvars (ignored by Git)
+# secrets.auto.tfvars (ignored by Git)
 api_key = "{{CUDO_API_KEY}}"
 ```
 
@@ -164,7 +175,7 @@ terraform state list & terraform show: These commands let you see what you've bu
 - Creates a VM resource named `cudo-ubuntu-mirror`:
   - CPU-only machine type (e.g., `intel-broadwell`)
   - 2 vCPUs, 4 GiB RAM
-  - 200 GiB boot disk from the `ubuntu-24-04` image
+  - 200 GiB boot disk from `var.image_id` (e.g., `ubuntu-2404`)
   - Attaches the 1 TiB storage disk to the VM
 - Uses your SSH keys (according to `ssh_key_source`) so you can log in after provisioning.
 
@@ -172,11 +183,9 @@ terraform state list & terraform show: These commands let you see what you've bu
 
 ## Initialize, plan, and apply
 
-Run all commands from the `cudo/` directory.
+Run all commands from the repository root (same directory as `cudo_terraform.tf`).
 
 ```bash path=null start=null
-cd cudo
-
 # Initialize providers and modules
 terraform init
 
@@ -186,14 +195,26 @@ terraform validate
 
 # Create a plan and save it to a file
 terraform plan --out plan.out
-# If you chose not to use secrets.auto.tfvars, you could also provide var files explicitly, e.g.:
-# terraform plan --var-file=terraform.tfvars --var-file=secrets.auto.tfvars --out plan.out
+# Note: *.auto.tfvars (e.g., secrets.auto.tfvars) are auto-loaded; explicit -var-file flags are usually unnecessary.
 
 # Apply exactly what was planned ("terraform run" is not a Terraform command)
 terraform apply plan.out
 # Or with explicit var files (if not using auto.tfvars):
 # terraform apply -var-file=terraform.tfvars -var-file=secrets.auto.tfvars plan.out
 ```
+
+## Listing available images
+
+We provide `images_lookup.tf` to list the image IDs exposed by the provider. This does not create any infrastructure; it only reads data.
+
+```bash path=null start=null
+# Query the images data source and print the first 50 entries
+terraform apply -target=data.cudo_vm_images.available -auto-approve
+terraform output -json available_images | jq -r '.[] | "\(.id)\t\(.name)\t\(.description)"' | head -n 50
+```
+
+- Pick the desired image ID (e.g., `ubuntu-2404`) and set `image_id` accordingly.
+- Optional cleanup: delete `images_lookup.tf` once done and run `terraform plan` to ensure no pending changes.
 
 ### Verifying the deployment
 
@@ -233,7 +254,7 @@ Terraform will prompt you for confirmation and then tear down the resources it c
 
 - Syntax issues: run `terraform validate` to catch common mistakes.
 - Provider/auth errors (e.g., 401/403): ensure `TF_VAR_api_key` is set and correct, and that your project ID is valid.
-- Invalid IDs: double-check `data_center_id` (e.g., `gb-bournemouth-1`) and `image_id` (e.g., `ubuntu-24-04`).
+- Invalid IDs: double-check `data_center_id` (e.g., `gb-bournemouth-1`) and `image_id` (e.g., `ubuntu-2404`).
 - Plan/apply errors: re-run with logging enabled to capture more detail.
 
 Enable logs:
