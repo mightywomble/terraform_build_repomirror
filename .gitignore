@@ -10,6 +10,9 @@ terraform.tfstate.backup
 *.auto.tfvars
 *.auto.tfvars.json
 
+# Terraform plan output file (local only)
+plan.out
+
 # Specifically ignore secret api key file
 cudo/secrets.auto.tfvars
 cudo/secrets.tfvars
