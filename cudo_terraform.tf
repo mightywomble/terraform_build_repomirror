@@ -36,6 +36,5 @@ resource "cudo_vm" "instance" {
       disk_id = cudo_storage_disk.ubuntu_mirror_storage.id
     }
   ]
-  max_price_hr   = 10.000
   ssh_key_source = var.ssh_key_source
 }
