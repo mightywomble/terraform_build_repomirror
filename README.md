@@ -46,7 +46,7 @@ Notes:
 
 3) Set your project_id and other values
 - Open terraform.tfvars and set:
-  - project_id = "<your Cudo Compute project name>"
+  - project_id = "your Cudo Compute project name"
   - image_id = "ubuntu-2404" (recommended)
   - data_center_id = "gb-bournemouth-1" (or your chosen data center)
   - vcpus, memory_gib, boot_disk_size, ssh_key_source as desired
