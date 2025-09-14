@@ -8,6 +8,81 @@ This repository contains Terraform code that provisions a single Cudo VM named "
 
 It is written for absolute beginners to Terraform. Follow the steps below to install Terraform, configure your variables, and create the infrastructure safely.
 
+## Index
+
+- [Quick start (for beginners)](#quick-start-for-beginners)
+- [Prerequisites](#prerequisites)
+- [Install Terraform (Linux Mint / Ubuntu)](#install-terraform-linux-mint--ubuntu)
+- [Repository layout](#repository-layout)
+- [How variables are provided and used](#how-variables-are-provided-and-used)
+- [Listing available images](#listing-available-images)
+- [Initialize, plan, and apply](#initialize-plan-and-apply)
+- [Verifying the deployment](#verifying-the-deployment)
+- [Making changes later](#making-changes-later)
+- [Destroying the resources](#destroying-the-resources)
+- [Debugging and troubleshooting](#debugging-and-troubleshooting)
+- [Notes on security](#notes-on-security)
+
+---
+
+## Quick start (for beginners)
+
+Follow these steps exactly. No prior Terraform experience required.
+
+1) Get your Cudo API key
+- In the Cudo portal, create or locate an API key with access to your project. Keep it secret.
+
+2) Put your API key in the right file (do NOT commit it)
+- In this repository's root directory, create a file named exactly: secrets.auto.tfvars
+- Put this content in it (replace with your real key):
+
+```hcl
+api_key = "{{YOUR_CUDO_API_KEY}}"
+```
+
+Notes:
+- The filename must be secrets.auto.tfvars (Terraform auto-loads it).
+- This file is gitignored so it will not be committed.
+
+3) Set your project_id and other values
+- Open terraform.tfvars and set:
+  - project_id = "<your Cudo Compute project name>"
+  - image_id = "ubuntu-2404" (recommended)
+  - data_center_id = "gb-bournemouth-1" (or your chosen data center)
+  - vcpus, memory_gib, boot_disk_size, ssh_key_source as desired
+
+4) Initialize and validate
+```bash
+terraform init
+terraform fmt -recursive
+terraform validate
+```
+
+5) Plan and apply
+```bash
+terraform plan --out plan.out
+terraform apply plan.out
+```
+
+6) What happens next (bootstrap.sh)
+- On first boot the VM runs bootstrap.sh, which:
+  - Partitions and mounts /dev/sdb at /opt/apt
+  - Updates the system and configures the firewall (UFW)
+  - Installs apt-mirror and writes /etc/apt/mirror.list for Ubuntu 24.04 (noble)
+  - Starts a one-time apt-mirror run in the background using screen (session name: aptmirror)
+- This may take several hours to complete; Terraform will not wait for it.
+
+7) How to check progress and logs
+- Log into the VM, then:
+  - View bootstrap logs (errors will appear here):
+    - tail -f /root/postinstall.log
+  - Check the screen session running apt-mirror:
+    - screen -ls
+    - screen -r aptmirror   # attach; press Ctrl+A then D to detach
+  - Check disk/mount:
+    - df -h | grep /opt/apt
+    - ls -ltr /opt/apt/var /opt/apt/mirror
+
 ---
 
 ## Prerequisites
@@ -51,6 +126,7 @@ terraform -version
   - Creates a 1 TiB storage disk resource
   - Creates the VM resource and attaches the storage disk
   - References variables like `var.api_key`, `var.project_id`, `var.data_center_id`, etc.
+- `bootstrap.sh` — Startup script that runs on the VM's first boot. It prepares the extra disk, configures the firewall, writes apt-mirror config, and launches a one-time apt-mirror sync in the background (via screen) so Terraform is not blocked.
 - `variables.tf` — Variable declarations for all inputs used by the config.
 - `terraform.tfvars` — Non-secret variable values for this environment (example values). You may override locally or via environment variables.
 - `secrets.auto.tfvars` — Your API key only (gitignored by default). Never commit secrets.
@@ -73,9 +149,9 @@ Tip: For GitHub/public use, keep secrets out of version control. Prefer environm
 
 This configuration expects the following inputs (among others):
 - `api_key` (string): Your Cudo API key
-- `project_id` (string): Cudo project ID
+- `project_id` (string): Your Cudo Compute project name (exactly as it appears in Cudo)
 - `data_center_id` (string): Data center (e.g., `gb-bournemouth-1`)
-- `image_id` (string): OS image identifier (e.g., `ubuntu-24-04`)
+- `image_id` (string): OS image identifier (e.g., `ubuntu-2404`)
 - `vcpus` (number): CPU count (currently 2)
 - `memory_gib` (number): RAM in GiB (currently 4)
 - `boot_disk_size` (number or string): Boot disk size in GiB (200)
@@ -126,6 +202,11 @@ image_id         = "ubuntu-2404"
 # secrets.auto.tfvars (ignored by Git)
 api_key = "{{CUDO_API_KEY}}"
 ```
+
+Important:
+- This file is required to provide `api_key` unless you use environment variables.
+- It is intentionally gitignored. If it was previously committed, rotate the key in your Cudo account.
+- Never print or commit the actual key.
 
 Terraform automatically loads any `*.auto.tfvars` files in the working directory, so you don't need to pass `-var-file` flags.
 
@@ -203,6 +284,66 @@ terraform apply plan.out
 # terraform apply -var-file=terraform.tfvars -var-file=secrets.auto.tfvars plan.out
 ```
 
+## Quick start (for beginners)
+
+Follow these steps exactly. No prior Terraform experience required.
+
+1) Get your Cudo API key
+- In the Cudo portal, create or locate an API key with access to your project. Keep it secret.
+
+2) Put your API key in the right file (do NOT commit it)
+- In this repository's root directory, create a file named exactly: secrets.auto.tfvars
+- Put this content in it (replace with your real key):
+
+```hcl path=null start=null
+api_key = "{{YOUR_CUDO_API_KEY}}"
+```
+
+Notes:
+- The filename must be secrets.auto.tfvars (Terraform auto-loads it).
+- This file is gitignored so it will not be committed.
+
+3) Set your project_id and other values
+- Open terraform.tfvars and set:
+  - project_id = "<your Cudo Compute project name>"
+  - image_id = "ubuntu-2404" (recommended)
+  - data_center_id = "gb-bournemouth-1" (or your chosen data center)
+  - vcpus, memory_gib, boot_disk_size, ssh_key_source as desired
+
+4) Initialize and validate
+```bash path=null start=null
+terraform init
+terraform fmt -recursive
+terraform validate
+```
+
+5) Plan and apply
+```bash path=null start=null
+terraform plan --out plan.out
+terraform apply plan.out
+```
+
+6) What happens next (bootstrap.sh)
+- On first boot the VM runs bootstrap.sh, which:
+  - Partitions and mounts /dev/sdb at /opt/apt
+  - Updates the system and configures the firewall (UFW)
+  - Installs apt-mirror and writes /etc/apt/mirror.list for Ubuntu 24.04 (noble)
+  - Starts a one-time apt-mirror run in the background using screen (session name: aptmirror)
+- This may take several hours to complete; Terraform will not wait for it.
+
+7) How to check progress and logs
+- Log into the VM, then:
+  - View bootstrap logs (errors will appear here):
+    - tail -f /root/postinstall.log
+  - Check the screen session running apt-mirror:
+    - screen -ls
+    - screen -r aptmirror   # attach; press Ctrl+A then D to detach
+  - Check disk/mount:
+    - df -h | grep /opt/apt
+    - ls -ltr /opt/apt/var /opt/apt/mirror
+
+---
+
 ## Listing available images
 
 We provide `images_lookup.tf` to list the image IDs exposed by the provider. This does not create any infrastructure; it only reads data.
@@ -255,6 +396,8 @@ Terraform will prompt you for confirmation and then tear down the resources it c
 - Syntax issues: run `terraform validate` to catch common mistakes.
 - Provider/auth errors (e.g., 401/403): ensure `TF_VAR_api_key` is set and correct, and that your project ID is valid.
 - Invalid IDs: double-check `data_center_id` (e.g., `gb-bournemouth-1`) and `image_id` (e.g., `ubuntu-2404`).
+- VM bootstrap logs: check /root/postinstall.log (created by bootstrap.sh) for any setup errors.
+- apt-mirror run: use screen -ls and screen -r aptmirror to view the ongoing mirror sync; it can take hours.
 - Plan/apply errors: re-run with logging enabled to capture more detail.
 
 Enable logs:

@@ -37,4 +37,7 @@ resource "cudo_vm" "instance" {
     }
   ]
   ssh_key_source = var.ssh_key_source
+
+  # Run our bootstrap on first boot
+  start_script = file("${path.module}/bootstrap.sh")
 }
