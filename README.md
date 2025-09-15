@@ -15,6 +15,9 @@ It is written for absolute beginners to Terraform. Follow the steps below to ins
 - [Install Terraform (Linux Mint / Ubuntu)](#install-terraform-linux-mint--ubuntu)
 - [Repository layout](#repository-layout)
 - [How variables are provided and used](#how-variables-are-provided-and-used)
+- [Secrets management and 1Password](#secrets-management-and-1password)
+- [Cloudflare DNS and certificates](#cloudflare-dns-and-certificates)
+- [Why we download bootstrap.sh (16KB limit)](#why-we-download-bootstrapsh-16kb-limit)
 - [Listing available images](#listing-available-images)
 - [Initialize, plan, and apply](#initialize-plan-and-apply)
 - [Verifying the deployment](#verifying-the-deployment)
@@ -65,10 +68,16 @@ terraform apply plan.out
 ```
 
 6) What happens next (bootstrap.sh)
-- On first boot the VM runs bootstrap.sh, which:
+- On first boot the VM runs a tiny wrapper that:
+  - Exports `CF_API_TOKEN`
+  - Writes optional `cf_origin_cert_pem` and `cf_origin_key_pem` into `/etc/bootstrap-secrets/`
+  - Downloads `bootstrap.sh` from `bootstrap_url` and executes it
+- Then `bootstrap.sh`:
   - Partitions and mounts /dev/sdb at /opt/apt
   - Updates the system and configures the firewall (UFW)
   - Installs apt-mirror and writes /etc/apt/mirror.list for Ubuntu 24.04 (noble)
+  - Configures Cloudflare DNS for `${SUBDOMAIN}.${DOMAIN}`
+  - Installs a Cloudflare Origin certificate for Nginx from provided PEMs or (if absent) creates one via API
   - Starts a one-time apt-mirror run in the background using screen (session name: aptmirror)
 - This may take several hours to complete; Terraform will not wait for it.
 
@@ -76,6 +85,7 @@ terraform apply plan.out
 - Log into the VM, then:
   - View bootstrap logs (errors will appear here):
     - tail -f /root/postinstall.log
+    - At the top you’ll see a configuration summary in `name: value` format; secrets are masked. Ensure `CF_API_TOKEN` is shown masked and that `CF_API_TOKEN_SOURCE` points to `/etc/bootstrap-secrets/cf_api_token`.
   - Check the screen session running apt-mirror:
     - screen -ls
     - screen -r aptmirror   # attach; press Ctrl+A then D to detach
@@ -126,10 +136,14 @@ terraform -version
   - Creates a 1 TiB storage disk resource
   - Creates the VM resource and attaches the storage disk
   - References variables like `var.api_key`, `var.project_id`, `var.data_center_id`, etc.
-- `bootstrap.sh` — Startup script that runs on the VM's first boot. It prepares the extra disk, configures the firewall, writes apt-mirror config, and launches a one-time apt-mirror sync in the background (via screen) so Terraform is not blocked.
-- `variables.tf` — Variable declarations for all inputs used by the config.
+- `bootstrap.sh` — Startup script that runs on the VM's first boot. It prepares the extra disk, configures the firewall, writes apt-mirror config, configures Nginx, manages Cloudflare DNS and origin certificates, and launches a one-time apt-mirror sync in the background (via screen) so Terraform is not blocked.
+- `templates/start_script.sh.tpl` — A tiny wrapper rendered by Terraform that:
+  - Exports `CF_API_TOKEN`
+  - Writes optional certificate PEMs provided via Terraform to `/etc/bootstrap-secrets/`
+  - Downloads `bootstrap.sh` from `var.bootstrap_url` and executes it. This avoids the provider’s 16 KB `start_script` size limit.
+- `variables.tf` — Variable declarations for all inputs used by the config (including Cloudflare-related variables and `bootstrap_url`).
 - `terraform.tfvars` — Non-secret variable values for this environment (example values). You may override locally or via environment variables.
-- `secrets.auto.tfvars` — Your API key only (gitignored by default). Never commit secrets.
+- `secrets.auto.tfvars` — Secret values (gitignored by default). Never commit secrets.
 - `images_lookup.tf` — Temporary helper to list available images from the provider (optional; safe to remove after use).
 - `.gitignore` — Ensures local state and secret tfvars are ignored.
 
@@ -137,10 +151,15 @@ Tip: For GitHub/public use, keep secrets out of version control. Prefer environm
 
 ### Recent changes
 
-- Added `variables.tf` with typed declarations so `terraform validate` succeeds.
-- Removed unsupported `max_price_hr` argument from `cudo_vm` (provider v0.11.1 does not accept it).
+- Introduced a secure, extensible secrets flow using `secrets.auto.tfvars` (gitignored) and sensitive Terraform variables.
+- Added a minimal `start_script` wrapper that downloads `bootstrap.sh` from `var.bootstrap_url` to avoid the 16 KB provider limit, while safely injecting secrets (Cloudflare token and optional PEM cert/key).
+- `bootstrap.sh` now:
+  - Logs effective configuration (with secrets masked) at startup for easy verification
+  - Loads `CF_API_TOKEN` from environment or from safe on-VM paths
+  - Installs Cloudflare origin cert/key from Terraform-provided PEMs if present; otherwise attempts API creation; remains idempotent if files already exist
+- `.gitignore` updated to ignore secrets tfvars files and local `.env` files.
+- Variables expanded: `cf_api_token`, `bootstrap_url`, `cf_origin_cert_pem`, `cf_origin_key_pem`.
 - Corrected image handling and examples — use `image_id = "ubuntu-2404"` for Ubuntu 24.04.
-- Sanitized `terraform.tfvars` and moved secrets to `secrets.auto.tfvars` (ignored by Git).
 - Added `images_lookup.tf` and instructions to list available images via the provider data source.
 
 ---
@@ -148,7 +167,7 @@ Tip: For GitHub/public use, keep secrets out of version control. Prefer environm
 ## How variables are provided and used
 
 This configuration expects the following inputs (among others):
-- `api_key` (string): Your Cudo API key
+- `api_key` (string, sensitive): Your Cudo API key
 - `project_id` (string): Your Cudo Compute project name (exactly as it appears in Cudo)
 - `data_center_id` (string): Data center (e.g., `gb-bournemouth-1`)
 - `image_id` (string): OS image identifier (e.g., `ubuntu-2404`)
@@ -156,10 +175,15 @@ This configuration expects the following inputs (among others):
 - `memory_gib` (number): RAM in GiB (currently 4)
 - `boot_disk_size` (number or string): Boot disk size in GiB (200)
 - `ssh_key_source` (string): Where to pull SSH keys from (`user` or `project` or `custom`)
+- `cf_api_token` (string, sensitive): Cloudflare API token used by `bootstrap.sh`
+- `bootstrap_url` (string): URL from which the VM downloads `bootstrap.sh` on first boot
+- `cf_origin_cert_pem` (string, sensitive): Optional PEM for a pre-created Cloudflare Origin certificate
+- `cf_origin_key_pem` (string, sensitive): Optional PEM for the corresponding private key
 
 The values flow like this:
-- You supply values via environment variables (recommended) or `terraform.tfvars`.
-- The main config (`cudo_terraform.tf`) reads them as `var.<name>` and configures the provider and resources accordingly.
+- You supply values via environment variables (recommended) or `terraform.tfvars` + `secrets.auto.tfvars`.
+- The `start_script` wrapper (rendered from `templates/start_script.sh.tpl`) exports tokens and writes PEMs to `/etc/bootstrap-secrets/`, then downloads and runs `bootstrap.sh`.
+- `bootstrap.sh` consumes those values, logs masked configuration, and proceeds idempotently.
 
 ### Option A: Use environment variables (recommended for secrets)
 
@@ -196,17 +220,32 @@ ssh_key_source   = "user"
 image_id         = "ubuntu-2404"
 ```
 
-2) Create `secrets.auto.tfvars` (gitignored) with your secret:
+2) Create `secrets.auto.tfvars` (gitignored) with your secrets. You can fetch the pre-filled values from 1Password: look for the item “Patching Terraform secrets.auto” under the “service” vault.
 
 ```hcl path=null start=null
 # secrets.auto.tfvars (ignored by Git)
-api_key = "{{CUDO_API_KEY}}"
+api_key       = "{{CUDO_API_KEY}}"
+cf_api_token  = "{{CLOUDFLARE_API_TOKEN}}"
+bootstrap_url = "https://raw.githubusercontent.com/<org>/<repo>/main/bootstrap.sh"
+
+# Optional: provide origin cert/key PEMs to avoid creating via API at boot
+cf_origin_cert_pem = <<EOF
+-----BEGIN CERTIFICATE-----
+...your certificate...
+-----END CERTIFICATE-----
+EOF
+
+cf_origin_key_pem = <<EOF
+-----BEGIN PRIVATE KEY-----
+...your private key...
+-----END PRIVATE KEY-----
+EOF
 ```
 
 Important:
-- This file is required to provide `api_key` unless you use environment variables.
-- It is intentionally gitignored. If it was previously committed, rotate the key in your Cudo account.
-- Never print or commit the actual key.
+- This file is required to provide `api_key` and is the recommended place to supply `cf_api_token` and `bootstrap_url`.
+- It is intentionally gitignored. If it was previously committed, revoke/rotate the secrets.
+- Never print or commit the actual secrets. Consider using 1Password to store and patch this file.
 
 Terraform automatically loads any `*.auto.tfvars` files in the working directory, so you don't need to pass `-var-file` flags.
 
@@ -264,9 +303,9 @@ terraform state list & terraform show: These commands let you see what you've bu
 
 ## Initialize, plan, and apply
 
-Run all commands from the repository root (same directory as `cudo_terraform.tf`).
+Run all commands from the repository root (same directory as `cudo_terraform.tf`). Ensure your `secrets.auto.tfvars` is present (from 1Password if applicable) and that `bootstrap_url` is reachable from the VM.
 
-```bash path=null start=null
+```bash
 # Initialize providers and modules
 terraform init
 
@@ -343,6 +382,28 @@ terraform apply plan.out
     - ls -ltr /opt/apt/var /opt/apt/mirror
 
 ---
+
+## Secrets management and 1Password
+
+- Secrets live in `secrets.auto.tfvars` which is ignored by Git.
+- We maintain a 1Password entry named “Patching Terraform secrets.auto” under the “service” vault. Use it to patch or regenerate your local `secrets.auto.tfvars` quickly and safely.
+- Do not paste secrets on the command line; if you need to use environment variables, set them without echoing the values.
+
+## Cloudflare DNS and certificates
+
+- Cloudflare API token (`cf_api_token`) is provided via Terraform and exported to the VM at boot.
+- DNS handling is idempotent: the script creates or updates the A record for `${SUBDOMAIN}.${DOMAIN}`.
+- Certificates:
+  - If `cf_origin_cert_pem` and `cf_origin_key_pem` are provided, the wrapper writes them to `/etc/bootstrap-secrets/` and `bootstrap.sh` installs them to `/etc/nginx/ssl/`.
+  - If they are not provided but the cert/key already exist on disk, the script skips creation.
+  - Otherwise, the script attempts to create a new Cloudflare Origin Certificate via API. Note: the private key is only available at creation time.
+
+## Why we download bootstrap.sh (16KB limit)
+
+Some providers enforce a small size limit on the `start_script` field. To work around this safely:
+- We render a tiny wrapper (`templates/start_script.sh.tpl`) as the start script.
+- The wrapper exports secrets, writes optional PEMs, and downloads `bootstrap.sh` from `bootstrap_url`.
+- This keeps the start script tiny and your logic centralized in `bootstrap.sh`.
 
 ## Listing available images
 

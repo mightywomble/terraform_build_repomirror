@@ -338,20 +338,54 @@ EOF
 
     log_action "Creating Nginx server block configuration..."
     cat << EOF > /etc/nginx/sites-available/${FULL_DOMAIN}.conf
+# Redirect all HTTP traffic to HTTPS
 server {
-    listen 80; server_name ${FULL_DOMAIN}; return 301 https://\$host\$request_uri;
+    listen 80;
+    server_name mirror.cudos.org;
+    return 301 https://$host$request_uri;
 }
+
+# Serve the repository over HTTPS
 server {
-    listen 443 ssl http2; server_name ${FULL_DOMAIN};
-    ssl_certificate ${SSL_DIR}/${FULL_DOMAIN}.pem;
-    ssl_certificate_key ${SSL_DIR}/${FULL_DOMAIN}.key;
+    listen 443 ssl http2;
+    server_name mirror.cudos.org;
+
+    # SSL Certificate Configuration
+    ssl_certificate /etc/nginx/ssl/mirror.cudos.org.pem;
+    ssl_certificate_key /etc/nginx/ssl/mirror.cudos.org.key;
+
+    # Modern SSL Security Settings
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
+    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM';
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-    location /ubuntu/ { alias ${APT_MIRROR_BASE_PATH}/archive.ubuntu.com/ubuntu/; autoindex on; }
-    location /ubuntu-security/ { alias ${APT_MIRROR_BASE_PATH}/security.ubuntu.com/ubuntu/; autoindex on; }
-    location /cudo-extra/ { alias /opt/apt/cudo-extra/; autoindex on; }
-    location / { return 200 "CUDOS APT Mirror - Ready\\n"; add_header Content-Type text/plain; }
+
+    # This is the main configuration for serving the mirror
+    location /ubuntu/ {
+        # IMPORTANT: Change this to the path you found in Step 2!
+        # It should be the directory that contains 'dists' and 'pool'.
+        alias /opt/apt/mirror/archive.ubuntu.com/ubuntu/;
+
+        # Enables directory listing so you can browse the repo in a web browser
+        autoindex on;
+    }
+
+    location /ubuntu-security/ {
+        # This is the path you provided for security updates
+        alias /opt/apt/mirror/security.ubuntu.com/ubuntu/;
+        autoindex on;
+    }
+
+    location /cudo-extra/ {
+        alias /opt/apt/cudo-extra/;
+        autoindex on; # Allows browsing the repo files
+    }
+
+    location / {
+        return 200 "CUDOS APT Mirror\n- /ubuntu/\n- /ubuntu-security/\n- /cudo-extra/\n";
+        add_header Content-Type text/plain;
+    }
+
 }
 EOF
     log_success "Nginx config created."
