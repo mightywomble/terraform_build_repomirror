@@ -295,22 +295,42 @@ EOF
         fi
     fi
 
-    log_action "Requesting Cloudflare Origin Certificate..."
-    local CERT_DATA
-    CERT_DATA=$(curl -s -X POST "https://api.cloudflare.com/client/v4/certificates" -H "Authorization: Bearer ${CF_API_TOKEN}" -H "Content-Type: application/json" --data "{\"hostnames\":[\"${FULL_DOMAIN}\",\"*.${DOMAIN}\"],\"requested_validity\":5475,\"request_type\":\"origin-rsa\"}")
-    local CERTIFICATE
-    CERTIFICATE=$(echo "$CERT_DATA" | jq -r '.result.certificate')
-    local PRIVATE_KEY
-    PRIVATE_KEY=$(echo "$CERT_DATA" | jq -r '.result.private_key')
-    [[ -z "$CERTIFICATE" || "$CERTIFICATE" == "null" ]] && log_error_exit "Failed to create Cloudflare Origin Certificate."
-    log_success "Origin Certificate created."
-    
+    # Prepare SSL paths and ensure directory exists
     local SSL_DIR="/etc/nginx/ssl"
+    local CERT_PATH="${SSL_DIR}/${FULL_DOMAIN}.pem"
+    local KEY_PATH="${SSL_DIR}/${FULL_DOMAIN}.key"
     mkdir -p "${SSL_DIR}"
-    echo "${CERTIFICATE}" > "${SSL_DIR}/${FULL_DOMAIN}.pem"
-    echo "${PRIVATE_KEY}" > "${SSL_DIR}/${FULL_DOMAIN}.key"
-    chmod 600 "${SSL_DIR}/${FULL_DOMAIN}.key"
-    log_success "Certificates placed securely in ${SSL_DIR}."
+
+    # If Terraform provided cert/key, install them
+    local BOOTSTRAP_CERT_SRC="/etc/bootstrap-secrets/cf_origin_certificate.pem"
+    local BOOTSTRAP_KEY_SRC="/etc/bootstrap-secrets/cf_origin_private_key.pem"
+    if [[ (! -s "$CERT_PATH" || ! -s "$KEY_PATH") && -s "$BOOTSTRAP_CERT_SRC" && -s "$BOOTSTRAP_KEY_SRC" ]]; then
+        cp "$BOOTSTRAP_CERT_SRC" "$CERT_PATH"
+        cp "$BOOTSTRAP_KEY_SRC" "$KEY_PATH"
+        chmod 600 "$KEY_PATH"
+        log_success "Installed Origin certificate and key from Terraform-provided secrets."
+    fi
+
+    if [[ -s "$CERT_PATH" && -s "$KEY_PATH" ]]; then
+        log_action "Found Origin certificate and key on disk; skipping certificate request."
+    else
+        log_action "Requesting Cloudflare Origin Certificate..."
+        local CERT_DATA
+        CERT_DATA=$(curl -s -X POST "https://api.cloudflare.com/client/v4/certificates" -H "Authorization: Bearer ${CF_API_TOKEN}" -H "Content-Type: application/json" --data "{\"hostnames\":[\"${FULL_DOMAIN}\",\"*.${DOMAIN}\"],\"requested_validity\":5475,\"request_type\":\"origin-rsa\"}")
+        local CERTIFICATE
+        CERTIFICATE=$(echo "$CERT_DATA" | jq -r '.result.certificate')
+        local PRIVATE_KEY
+        PRIVATE_KEY=$(echo "$CERT_DATA" | jq -r '.result.private_key')
+
+        if [[ -z "$CERTIFICATE" || "$CERTIFICATE" == "null" || -z "$PRIVATE_KEY" || "$PRIVATE_KEY" == "null" ]]; then
+            log_error_exit "Failed to create Cloudflare Origin Certificate. If an Origin cert already exists in Cloudflare, note the private key cannot be retrieved from the API. Provide existing files at $CERT_PATH and $KEY_PATH, or revoke and recreate."
+        fi
+
+        echo "${CERTIFICATE}" > "$CERT_PATH"
+        echo "${PRIVATE_KEY}" > "$KEY_PATH"
+        chmod 600 "$KEY_PATH"
+        log_success "Origin Certificate created and placed securely in ${SSL_DIR}."
+    fi
     
     log_action "Setting Cloudflare SSL/TLS mode to 'Full (Strict)'..."
     curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/settings/ssl" -H "Authorization: Bearer ${CF_API_TOKEN}" -H "Content-Type: application/json" --data '{"value":"strict"}' | jq -e '.success == true' > /dev/null || log_action "Warning: Failed to set SSL/TLS mode. Please set to 'Full (Strict)' manually."

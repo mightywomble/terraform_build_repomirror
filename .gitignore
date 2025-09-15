@@ -21,3 +21,7 @@ cudo/secrets.tfvars
 cudo/cf_api_token
 .env
 .env.*
+
+# Local secrets files (avoid committing sensitive values)
+secrets.auto.tfvars
+secrets.tfvars

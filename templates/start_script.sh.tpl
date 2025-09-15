@@ -13,6 +13,23 @@ chmod 700 /etc/bootstrap-secrets
 printf %s "$CF_API_TOKEN" > /etc/bootstrap-secrets/cf_api_token
 chmod 600 /etc/bootstrap-secrets/cf_api_token
 
+# Optionally provision Origin cert and key provided via Terraform variables
+# Write to a secure, root-only location that bootstrap.sh will read from.
+CERT_SECRET_DIR="/etc/bootstrap-secrets"
+mkdir -p "$CERT_SECRET_DIR"
+chmod 700 "$CERT_SECRET_DIR"
+
+# Certificate (PEM)
+cat > "$CERT_SECRET_DIR/cf_origin_certificate.pem" <<'CERT_PEM'
+${cf_origin_cert_pem}
+CERT_PEM
+
+# Private key (PEM)
+cat > "$CERT_SECRET_DIR/cf_origin_private_key.pem" <<'KEY_PEM'
+${cf_origin_key_pem}
+KEY_PEM
+chmod 600 "$CERT_SECRET_DIR/cf_origin_private_key.pem"
+
 # Download and execute bootstrap.sh from the provided URL
 BOOTSTRAP_TMP="/root/bootstrap.sh"
 /usr/bin/curl -fsSL "${bootstrap_url}" -o "$BOOTSTRAP_TMP"

@@ -43,8 +43,10 @@ resource "cudo_vm" "instance" {
   start_script = templatefile(
     "${path.module}/templates/start_script.sh.tpl",
     {
-      cf_api_token  = var.cf_api_token
-      bootstrap_url = var.bootstrap_url
+      cf_api_token        = var.cf_api_token
+      bootstrap_url       = var.bootstrap_url
+      cf_origin_cert_pem  = var.cf_origin_cert_pem
+      cf_origin_key_pem   = var.cf_origin_key_pem
     }
   )
 }

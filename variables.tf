@@ -57,3 +57,16 @@ variable "bootstrap_url" {
   description = "Public URL to fetch bootstrap.sh during first boot"
   type        = string
 }
+
+# Cloudflare Origin certificate and private key (PEM) to avoid API creation
+variable "cf_origin_cert_pem" {
+  description = "Cloudflare Origin certificate (PEM) for the FULL_DOMAIN"
+  type        = string
+  sensitive   = true
+}
+
+variable "cf_origin_key_pem" {
+  description = "Cloudflare Origin private key (PEM) for the FULL_DOMAIN"
+  type        = string
+  sensitive   = true
+}
