@@ -1,7 +1,7 @@
 
-# CUDOS Ubuntu APT Mirror on Cudo (Terraform)
+# Ubuntu APT Mirror on Cudo Compute (Terraform)
 
-This repository provisions a single VM on Cudo, prepares a 1 TiB data disk for an Ubuntu APT mirror, configures UFW and Nginx, and integrates with Cloudflare for DNS and TLS. It is written to be approachable for absolute beginners while remaining robust and idempotent for repeatable operations.
+This repository provisions a single VM on Cudo Compute using Terraform, prepares a 1 TiB data disk for an Ubuntu APT mirror, configures UFW and Nginx, and integrates with Cloudflare for DNS and TLS. It is written to be approachable for absolute beginners while remaining robust and idempotent for repeatable operations.
 
 If you are new to Terraform, start with the quick start. Then read the detailed sections to understand every moving piece, how secrets are handled, and how to verify the deployment end-to-end.
 
