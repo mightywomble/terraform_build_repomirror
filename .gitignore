@@ -16,3 +16,8 @@ plan.out
 # Specifically ignore secret api key file
 cudo/secrets.auto.tfvars
 cudo/secrets.tfvars
+
+# Secrets for bootstrap.sh
+cudo/cf_api_token
+.env
+.env.*

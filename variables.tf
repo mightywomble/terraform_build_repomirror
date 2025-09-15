@@ -44,3 +44,16 @@ variable "cudo_platform" {
   description = "Label for platform/environment"
   type        = string
 }
+
+# Cloudflare API token passed securely from Terraform into the VM's start_script
+variable "cf_api_token" {
+  description = "Cloudflare API token used by bootstrap.sh"
+  type        = string
+  sensitive   = true
+}
+
+# URL where the VM can download the bootstrap.sh (must be reachable from the VM)
+variable "bootstrap_url" {
+  description = "Public URL to fetch bootstrap.sh during first boot"
+  type        = string
+}

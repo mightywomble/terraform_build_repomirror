@@ -38,6 +38,13 @@ resource "cudo_vm" "instance" {
   ]
   ssh_key_source = var.ssh_key_source
 
-  # Run our bootstrap on first boot
-  start_script = file("${path.module}/bootstrap.sh")
+  # Run our bootstrap on first boot. We render a small wrapper that exports CF_API_TOKEN
+  # and then executes the contents of bootstrap.sh under bash.
+  start_script = templatefile(
+    "${path.module}/templates/start_script.sh.tpl",
+    {
+      cf_api_token  = var.cf_api_token
+      bootstrap_url = var.bootstrap_url
+    }
+  )
 }
