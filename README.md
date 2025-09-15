@@ -1,3 +1,4 @@
+
 # CUDOS Ubuntu APT Mirror on Cudo (Terraform)
 
 This repository provisions a single VM on Cudo, prepares a 1 TiB data disk for an Ubuntu APT mirror, configures UFW and Nginx, and integrates with Cloudflare for DNS and TLS. It is written to be approachable for absolute beginners while remaining robust and idempotent for repeatable operations.
@@ -64,6 +65,11 @@ EOF
 
 4) Set non-secret values in terraform.tfvars
 - Open terraform.tfvars and set values like project_id, data_center_id, image_id, vcpus, memory_gib, boot_disk_size, ssh_key_source.
+- Change
+-- project_id to match the project name you want to deploy into cudo compute
+-- data_center_id to match the DC (bournmouth should be ok no GPU needed) 
+-- ssh_key_source to project to use all the ssh keys in the cudo project (leave as user while testing)
+
 - Example:
 ```hcl path=null start=null
 project_id       = "cudos-public-testnet"
