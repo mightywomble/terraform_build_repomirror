@@ -1,5 +1,4 @@
 project_id     = "cudos-mgmt-lan"
-cudo_platform  = "ubuntu-mirror"
 boot_disk_size = "200"
 vcpus          = 2
 memory_gib     = 4

@@ -15,14 +15,14 @@ provider "cudo" {
 # 1TB storage disk to attach to the VM
 resource "cudo_storage_disk" "ubuntu_mirror_storage" {
   data_center_id = var.data_center_id
-  id             = "cudo-ubuntu-mirror-disk1"
+  id             = "${var.vm_id}-aptstorage"
   size_gib       = 1024
 }
 
 # Single VM for the Ubuntu mirror
 resource "cudo_vm" "instance" {
   depends_on     = [cudo_storage_disk.ubuntu_mirror_storage]
-  id             = "cudo-ubuntu-mirror"
+  id             = var.vm_id
   machine_type   = "intel-broadwell"
   data_center_id = var.data_center_id
   memory_gib     = var.memory_gib
@@ -43,10 +43,10 @@ resource "cudo_vm" "instance" {
   start_script = templatefile(
     "${path.module}/templates/start_script.sh.tpl",
     {
-      cf_api_token        = var.cf_api_token
-      bootstrap_url       = var.bootstrap_url
-      cf_origin_cert_pem  = var.cf_origin_cert_pem
-      cf_origin_key_pem   = var.cf_origin_key_pem
+      cf_api_token       = var.cf_api_token
+      bootstrap_url      = var.bootstrap_url
+      cf_origin_cert_pem = var.cf_origin_cert_pem
+      cf_origin_key_pem  = var.cf_origin_key_pem
     }
   )
 }

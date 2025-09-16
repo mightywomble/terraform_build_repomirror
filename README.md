@@ -9,6 +9,7 @@ If you are new to Terraform, start with the quick start. Then read the detailed 
 - [Quick start (beginner-friendly)](#quick-start-beginner-friendly)
 - [What this deploys](#what-this-deploys)
 - [Repository tour (what each file does)](#repository-tour-what-each-file-does)
+- [Recent updates](#recent-updates)
 - [Variables and secrets (and how we keep them safe)](#variables-and-secrets-and-how-we-keep-them-safe)
 - [Secrets management and 1Password](#secrets-management-and-1password)
 - [Cloudflare DNS and certificates](#cloudflare-dns-and-certificates)
@@ -66,8 +67,8 @@ EOF
 - Open terraform.tfvars and set values like project_id, data_center_id, image_id, vcpus, memory_gib, boot_disk_size, ssh_key_source.
 - Example:
 ```hcl path=null start=null
+vm_id            = "cudo-ubuntu-mirror"          # human-friendly identifier for the VM
 project_id       = "cudos-public-testnet"
-cudo_platform    = "public-testnet"
 boot_disk_size   = "200"   # GiB
 vcpus            = 2
 memory_gib       = 4
@@ -116,8 +117,9 @@ terraform apply plan.out
 
 - cudo_terraform.tf
   - Declares the Cudo provider and creates two resources:
-    - cudo_storage_disk.ubuntu_mirror_storage (1 TiB data disk)
-    - cudo_vm.instance (the VM)
+- cudo_storage_disk.ubuntu_mirror_storage (1 TiB data disk)
+  - Its id is derived from vm_id as "${vm_id}-aptstorage"
+- cudo_vm.instance (the VM)
   - Uses start_script to run a tiny wrapper rendered from a template.
 
 - variables.tf
@@ -155,6 +157,11 @@ terraform apply plan.out
   - Ignores Terraform state/local artifacts and local secrets files.
 
 ---
+
+## Recent updates
+
+- Added vm_id variable so the VM id is configurable via terraform.tfvars. The 1 TiB storage disk id is now derived from vm_id as "${vm_id}-aptstorage".
+- Removed unused cudo_platform variable and all references from code and docs.
 
 ## Variables and secrets (and how we keep them safe)
 
@@ -625,7 +632,6 @@ variable "vcpus" { type = number }
 variable "memory_gib" { type = number }
 variable "boot_disk_size" {}
 variable "ssh_key_source" {}
-variable "cudo_platform" {}
 ```
 
 ---

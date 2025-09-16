@@ -39,11 +39,12 @@ variable "ssh_key_source" {
   type        = string
 }
 
-# Declared because it's present in terraform.tfvars
-variable "cudo_platform" {
-  description = "Label for platform/environment"
+# The VM ID to assign to the cudo_vm resource (human-readable identifier)
+variable "vm_id" {
+  description = "Identifier for the VM (used as cudo_vm.instance id)"
   type        = string
 }
+
 
 # Cloudflare API token passed securely from Terraform into the VM's start_script
 variable "cf_api_token" {
