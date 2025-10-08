@@ -227,9 +227,9 @@ main() {
     log_action "Configuring ${MIRROR_CONFIG_FILE}..."
     [ -f "$MIRROR_CONFIG_FILE" ] && mv "$MIRROR_CONFIG_FILE" "${MIRROR_CONFIG_FILE}.bak.$(date +%F-%T)"
 
-    cat <<EOF > "$MIRROR_CONFIG_FILE"
+    cat <<'EOF' > "$MIRROR_CONFIG_FILE"
 ############# apt-mirror config #############
-set base_path    ${MOUNT_POINT}
+set base_path    /opt/apt
 set mirror_path  $base_path/mirror
 set skel_path    $base_path/skel
 set var_path     $base_path/var

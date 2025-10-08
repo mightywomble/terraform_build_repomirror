@@ -2,7 +2,7 @@ terraform {
   required_providers {
     cudo = {
       source  = "CudoVentures/cudo"
-      version = "0.11.1"
+      version = "0.11.2"
     }
   }
 }
@@ -15,14 +15,14 @@ provider "cudo" {
 # 1TB storage disk to attach to the VM
 resource "cudo_storage_disk" "ubuntu_mirror_storage" {
   data_center_id = var.data_center_id
-  id             = "${var.vm_id}-aptstorage"
-  size_gib       = 1024
+  id             = "${replace(var.vm_id, "_", "-")}-aptstorage"
+  size_gib       = 20
 }
 
 # Single VM for the Ubuntu mirror
 resource "cudo_vm" "instance" {
   depends_on     = [cudo_storage_disk.ubuntu_mirror_storage]
-  id             = var.vm_id
+  id             = replace(var.vm_id, "_", "-")
   machine_type   = "intel-broadwell"
   data_center_id = var.data_center_id
   memory_gib     = var.memory_gib
